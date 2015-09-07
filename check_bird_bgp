@@ -1,0 +1,77 @@
+#!/bin/bash
+###########
+# 2015.09.04 r.aviolat@gmail.com - initial file creation
+# check the number of routes learned from BGP sessions using birdc and birdc6
+
+help="Usage: $0 -v [4(ipv4), 6(ipv6) -c <critical> -w <warning>"
+proto_name="BGP_proto_name"
+peer="Remote peer"
+
+while getopts 'o:c:w:v:' opt; do
+  case $opt in
+    o)
+      object="${OPTARG}"
+      ;;
+    c)
+      critical="${OPTARG}"
+      ;;
+    v)
+      version="${OPTARG}"
+      ;;
+    w)
+      warning="${OPTARG}"
+      ;;
+    \?|:)
+      echo ${help}
+      exit 3
+      ;;
+  esac
+done
+
+# standard Icinga / Nagios plugin return codes.
+STATUS_OK=0
+STATUS_WARNING=1
+STATUS_CRITICAL=2
+STATUS_UNKNOWN=3
+
+# check that the following values were correctly set
+if [ -z ${version} ] || [ -z ${warning} ] || [ -z ${critical} ]  || [ "$critical" -gt "$warning" ] ; then
+  echo ${help}
+  exit 3
+fi
+
+if [ $version == "4" ]; then
+  bgp_ver="BGPv4"
+  bird_cli="birdc"
+
+elif [ $version == "6" ]; then
+  bgp_ver="BGPv6"
+  bird_cli="birdc6"
+
+else
+  echo ${help}
+  exit 3
+fi
+
+bgp_routes=$($bird_cli show route protocol $proto_name count | grep routes | cut -d " " -f 1)
+value=$bgp_routes
+
+# compare the actual vlaue with the critical and warning values
+if [ "$value" -lt "$warning" ]; then
+ 
+  if [ "$value" -lt "$critical" ]; then
+    echo "CRITICAL - $peer $bgp_ver routes $value|$bgp_ver_routes=$value;;;;"
+    exit 2
+ 
+  else
+    echo "WARNING - $peer $bgp_ver routes $value|$bgp_ver_routes=$value;;;;"
+    exit 1
+  fi  
+
+else
+  echo "OK - $peer $bgp_ver routes $value|$bgp_ver_routes=$value;;;;"
+  exit 0
+
+fi
+
+

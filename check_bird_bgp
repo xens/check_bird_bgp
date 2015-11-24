@@ -1,19 +1,21 @@
 #!/bin/bash
 ###########
+# 2015.11.24 r.aviolat@gmail.com - added ability to specify which "protocol" to check with the -p option
 # 2015.09.04 r.aviolat@gmail.com - initial file creation
-# check the number of routes learned from BGP sessions using birdc and birdc6
+# check the number of routes learned from using birdc and birdc6
 
-help="Usage: $0 -v [4(ipv4), 6(ipv6) -c <critical> -w <warning>"
-proto_name="BGP_proto_name"
-peer="Remote peer"
+help="Usage: $0 -v [4(ipv4), 6(ipv6), -p <bird protocol name> -c <critical> -w <warning>"
 
-while getopts 'o:c:w:v:' opt; do
+while getopts 'o:c:w:v:p:' opt; do
   case $opt in
     o)
       object="${OPTARG}"
       ;;
     c)
       critical="${OPTARG}"
+      ;;
+    p)
+      protocol="${OPTARG}"
       ;;
     v)
       version="${OPTARG}"
@@ -35,7 +37,7 @@ STATUS_CRITICAL=2
 STATUS_UNKNOWN=3
 
 # check that the following values were correctly set
-if [ -z ${version} ] || [ -z ${warning} ] || [ -z ${critical} ]  || [ "$critical" -gt "$warning" ] ; then
+if [ -z ${version} ] || [ -z ${protocol} ] || [ -z ${warning} ] || [ -z ${critical} ]  || [ "$critical" -gt "$warning" ] ; then
   echo ${help}
   exit 3
 fi
@@ -43,35 +45,37 @@ fi
 if [ $version == "4" ]; then
   bgp_ver="BGPv4"
   bird_cli="birdc"
+  perf_text="bgp_v4_routes"
 
 elif [ $version == "6" ]; then
   bgp_ver="BGPv6"
   bird_cli="birdc6"
+  perf_text="bgp_v6_routes"
 
 else
   echo ${help}
   exit 3
 fi
 
-bgp_routes=$($bird_cli show route protocol $proto_name count | grep routes | cut -d " " -f 1)
+provider=$(echo $protocol | cut -d "_" -f 1)
+bgp_routes=$($bird_cli show route protocol $protocol count | grep routes | cut -d " " -f 1)
 value=$bgp_routes
 
 # compare the actual vlaue with the critical and warning values
 if [ "$value" -lt "$warning" ]; then
  
   if [ "$value" -lt "$critical" ]; then
-    echo "CRITICAL - $peer $bgp_ver routes $value|$bgp_ver_routes=$value;;;;"
+    echo "CRITICAL - $provider $bgp_ver routes $value|$perf_text=$value;;;;"
     exit 2
  
   else
-    echo "WARNING - $peer $bgp_ver routes $value|$bgp_ver_routes=$value;;;;"
+    echo "WARNING - $provider $bgp_ver routes $value|$perf_text=$value;;;;"
     exit 1
   fi  
 
 else
-  echo "OK - $peer $bgp_ver routes $value|$bgp_ver_routes=$value;;;;"
+  echo "OK - $provider $bgp_ver routes $value|$perf_text=$value;;;;"
   exit 0
 
 fi
-
 
